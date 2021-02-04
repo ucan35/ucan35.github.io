@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="series of technical writeups about computers and software development">
+    
+    <link rel="shortcut icon" href="https://ucan35.github.io/favicon.ico">
+    
+    <link rel="stylesheet" href="/css/style.min.css">
+
+    <title>Making Terminal Your Home</title>
+</head>
+<body><header id="banner">
+    <h2><a href="https://ucan35.github.io">can&#39;s corner</a></h2>
+    <nav>
+        <ul>
+            <li>
+                <a href="/" title="posts">posts</a>
+            </li><li>
+                <a href="/about/" title="about">about</a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main id="content">
+<article>
+    <header id="post-header">
+        <h1>Making Terminal Your Home</h1><time>February 1, 2021</time></header><p>Home is where you feel comfortable and safe. It&rsquo;s your place that you can organize stuff to your convention.
+The very same feeling with your with your terminal can empower you and increase your productivity greatly.</p>
+<p>The reason why I prefer terminals is not because that they make you cool. While I don&rsquo;t deny that they indeed
+make you cool, the main reason is that they provide you only the most essential data, text streams.
+Terminals provide you the most condensed data over sole texts. This enables you to enhance your focus and
+increase your perception. Small and simple programs as building blocks lets you to implement more complex
+solutions. Of course, this is thanks to GNU<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup> and other Linux tools.</p>
+<p>For me, they are the great product of the Unix philosophy<sup id="fnref:2"><a href="#fn:2" class="footnote-ref" role="doc-noteref">2</a></sup>.</p>
+<ul>
+<li>Write programs that do one thing and do it well.</li>
+<li>Write programs to work together.</li>
+<li>Write programs to handle text streams, because that is a universal interface.</li>
+</ul>
+<p>I firmly believe that making yourself comfortable with terminals enables you a great potential. That is why I
+would like to give you some basic but effective features that I use in my environment. This post will be
+mostly based on my dotfiles<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup>.</p>
+<p>Before we jump on, I recommend you switch to <code>en-US</code> keyboard layout when interacting with terminal
+applications. Most of the time, the shortcuts are designed with <code>en-US</code> keyboard layout in mind. For this
+reason, having two keyboard layouts one for your native layout and one for <code>en-US</code> would be beneficial.</p>
+<h2 id="reverse-search">Reverse search</h2>
+<p>Often times I forget a command I have issued before, or I don&rsquo;t want type it over again. Terminals have a
+buffer and history file that holds records of past commands. The file is pointed via <code>HISTFILE</code> environment
+variable. While you can click up arrow in your keyboard to iterate over most recent commands, terminals also
+have <code>reverse search</code> functionality.</p>
+<p>This functionality is bound to <code>ctrl-r</code> key combination. After activating <code>reverse search</code> panel, you can
+start typing to begin your search from your buffer and history file. Among the results you can navigate and
+select the entry you want. In my environment, I have this functionality integrated with <code>fzf</code><sup id="fnref:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup> which
+enhances this even more. The integration of <code>fzf</code> can be found
+<a href="https://github.com/ucan35/dotfiles/blob/eb08f61e316de78fcbbd0beebadd44f3e23e3a5c/.config/bash/bashrc#L36">here</a>.</p>
+<script id="asciicast-1nDsnNDVMIwqDw1gqTB9xFqcn" src="https://asciinema.org/a/1nDsnNDVMIwqDw1gqTB9xFqcn.js" data-speed="1.5" async></script>
+<h2 id="directory-navigation">Directory navigation</h2>
+<p>It may be the case where you have many directories, or even worse, many nested directories. In situations like
+this, the directory navigation can easily turn into torture. I can&rsquo;t image all the <code>cd</code> commands that were
+issued into wrong directory. For this reason, <code>fzf</code> has yet another feature called <code>fzf_cd</code>. What this feature
+essentially does is It executes <code>find</code> to list all possible directories and enables you to make search on
+them. Much like <code>reverse search</code>, except this time upon selecting a entry, <code>fzf</code> automatically takes you there.
+On my system this is bound to <code>alt-c</code> key combination.</p>
+<script id="asciicast-n850XtQWEjWK7Q5csdVdQZlyT" src="https://asciinema.org/a/n850XtQWEjWK7Q5csdVdQZlyT.js" data-speed="1.5" async></script>
+<h2 id="text-navigation">Text navigation</h2>
+<p>Terminals are all about text streams. Invoking applications and providing them arguments are all made via
+texts. But we are human beings and we can typo a lot. Sometimes we can notice our typos way after we wrote a
+long command. It can be cumbersome to move the cursor over typo and fix it. Terminals have shortcuts for text
+navigation. The one I use the most is <code>ctrl-&lt;left/right arrow&gt;</code> key combination to jump over words. There are
+also other key combinations to delete words, go to line beginning, crop everything preceding/trailing cursor
+and many others.</p>
+<ul>
+<li>Delete word <code>ctrl-w</code></li>
+<li>Go to line beginning <code>ctrl-a</code></li>
+<li>Crop everything preceding cursor <code>ctrl-u</code></li>
+<li>Crop everything trailing cursor <code>ctrl-k</code></li>
+</ul>
+<script id="asciicast-MbhSDvMPJ058z6QLmViRGhYSv" src="https://asciinema.org/a/MbhSDvMPJ058z6QLmViRGhYSv.js" data-speed="1.5" async></script>
+<h2 id="tmux">Tmux</h2>
+<p>We may need multiple terminals at the same time depending on the task we are busy with. Switching between
+multiple terminal windows and aligning them can be a burden. That&rsquo;s where Tmux<sup id="fnref:5"><a href="#fn:5" class="footnote-ref" role="doc-noteref">5</a></sup> comes into play. Tmux
+stands for terminal multiplexer. It has features like splitting panes, creating windows and sessions.</p>
+<p>Tmux is highly customizable to fit into your convention. I find the default key combinations of Tmux
+confusing. You can my customized key combinations
+<a href="https://github.com/ucan35/dotfiles/blob/eb08f61e316de78fcbbd0beebadd44f3e23e3a5c/.config/tmux/main.conf">here</a>.</p>
+<p>Not only the key combinations, the theme is customizable as well. In fact, you can find my minimal theme
+customization at
+<a href="https://github.com/ucan35/dotfiles/blob/eb08f61e316de78fcbbd0beebadd44f3e23e3a5c/.config/tmux/style.conf#L1">here</a>.</p>
+<script id="asciicast-Wplz0BWUlHJtlaAUPDugQ03Lw" src="https://asciinema.org/a/Wplz0BWUlHJtlaAUPDugQ03Lw.js" data-speed="1.5" async></script>
+<h2 id="conclusion">Conclusion</h2>
+<p>As for parting words, I would like to share a final act to show you my daily development environment combining
+all the tools to show you much more is possible with terminals. Hope that can inspire and motivate you into
+terminals.</p>
+<script id="asciicast-NOtKjt6CGOTD7qnceO3eRRkwr" src="https://asciinema.org/a/NOtKjt6CGOTD7qnceO3eRRkwr.js" data-speed="1.5" async></script>
+<p>I encourage you to check out my <a href="https://github.com/ucan35/dotfiles">dotfiles</a> repostiory and play around.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1" role="doc-endnote">
+<p><a href="https://www.gnu.org/philosophy/categories.html#GNUsoftware">https://www.gnu.org/philosophy/categories.html#GNUsoftware</a> <a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:2" role="doc-endnote">
+<p><a href="http://www.catb.org/~esr/writings/taoup/html/ch01s06.html">http://www.catb.org/~esr/writings/taoup/html/ch01s06.html</a> <a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:3" role="doc-endnote">
+<p><a href="https://github.com/ucan35/dotfiles">https://github.com/ucan35/dotfiles</a> <a href="#fnref:3" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:4" role="doc-endnote">
+<p><a href="https://github.com/junegunn/fzf">https://github.com/junegunn/fzf</a> <a href="#fnref:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:5" role="doc-endnote">
+<p><a href="https://github.com/tmux/tmux">https://github.com/tmux/tmux</a> <a href="#fnref:5" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+</article>
+
+        </main><footer id="footer">
+    Copyright © 2021 Can UNSAL
+</footer>
+</body>
+</html>

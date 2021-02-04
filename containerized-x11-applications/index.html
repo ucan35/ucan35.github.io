@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="series of technical writeups about computers and software development">
+    
+    <link rel="shortcut icon" href="https://ucan35.github.io/favicon.ico">
+    
+    <link rel="stylesheet" href="/css/style.min.css">
+
+    <title>Containerized X11 Applications</title>
+</head>
+<body><header id="banner">
+    <h2><a href="https://ucan35.github.io">can&#39;s corner</a></h2>
+    <nav>
+        <ul>
+            <li>
+                <a href="/" title="posts">posts</a>
+            </li><li>
+                <a href="/about/" title="about">about</a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main id="content">
+<article>
+    <header id="post-header">
+        <h1>Containerized X11 Applications</h1><time>January 30, 2021</time></header><p>Containers<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup> are great. They provide us means to isolate applications by leveraging Linux namespaces<sup id="fnref:2"><a href="#fn:2" class="footnote-ref" role="doc-noteref">2</a></sup>. We
+can run any kind of application under containers, including X11<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup> applications.</p>
+<p>X11 applications are essentially applications with GUI&rsquo;s that use X. While applications like standard Linux
+utilities can be easily run under containers since they tend to have minimal dependencies, X11 applications on
+the other hand, can be a bit more difficult to do so.</p>
+<p>Main dependency of X11 applications are an X server which they can talk to. While it is doable to run fully
+fledged X server inside a container, it is also possible to expose host X11 socket to container. The latter
+would decrease a good amount of dependency and let us to see the application window in our host X system where
+we are currently at. For this exercise, we will use Docker<sup id="fnref:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup> to containerize Discord application.</p>
+<h2 id="creating-the-container-image">Creating the container image</h2>
+<p>In order to create our container image, we must first choose a base image. Since Discord provides a <code>deb</code>
+format package, we can opt for any Debian based image for our starting point. To keep it minimal, the
+<code>debian:buster-slim</code><sup id="fnref:5"><a href="#fn:5" class="footnote-ref" role="doc-noteref">5</a></sup> image can be used. From here on, we can proceed to install our package as usual in a
+Debian environment.</p>
+<div class="highlight"><pre class="chroma"><code class="language-Dockerfile" data-lang="Dockerfile"><span class="k">FROM</span><span class="s"> debian:buster-slim</span><span class="err">
+</span><span class="err">
+</span><span class="err"></span><span class="k">COPY</span> discord.deb /tmp/discord.deb<span class="err">
+</span><span class="err"></span><span class="k">RUN</span> <span class="se">\
+</span><span class="se"></span>    apt-get update <span class="o">&amp;&amp;</span> <span class="se">\
+</span><span class="se"></span>    apt-get install --no-install-recommends --yes <span class="se">\
+</span><span class="se"></span>        /tmp/discord.deb <span class="o">&amp;&amp;</span> <span class="se">\
+</span><span class="se"></span>    rm /tmp/discord.deb<span class="err">
+</span></code></pre></div><p>Ideally, package maintainers should specify all dependencies for the application in their package format. The
+<code>apt</code> package manager would install all required dependencies listed in package. In case of any missing
+dependencies, It is good practice to issue <code>ldd</code> command to find out any missing shared library dependencies,
+and install their corresponding packages. For our case, packages missing below were added to our <code>Dockerfile</code>.</p>
+<div class="highlight"><pre class="chroma"><code class="language-Dockerfile" data-lang="Dockerfile"><span class="c"># Install missing dependencies.</span><span class="err">
+</span><span class="err"></span><span class="k">RUN</span> <span class="se">\
+</span><span class="se"></span>    apt-get install --no-install-recommends --yes <span class="se">\
+</span><span class="se"></span>        libx11-xcb1 <span class="se">\
+</span><span class="se"></span>        libxcb-dri3-0 <span class="se">\
+</span><span class="se"></span>        libatk-bridge2.0-0 <span class="se">\
+</span><span class="se"></span>        libgtk-3-0 <span class="se">\
+</span><span class="se"></span>        libdrm2 <span class="se">\
+</span><span class="se"></span>        libgbm1<span class="err">
+</span></code></pre></div><p>Now we have that our <code>Dockerfile</code> prepared, we can build it.</p>
+<div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh"><span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:01<span class="o">]</span> <span class="o">[</span>can@homebook discord<span class="o">]</span>
+$ ls -1
+discord.deb
+Dockerfile
+<span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:02<span class="o">]</span> <span class="o">[</span>can@homebook discord<span class="o">]</span>
+$ docker build -t discord:0.0.13 .
+...
+Successfully tagged discord:0.0.13
+</code></pre></div><h2 id="running-the-container-with-x">Running the container with X</h2>
+<p>By design an X server can communicate with clients over either unix domain sockets or TCP sockets. In this
+context, the client would be our X11 application that will run under container. Hence, It&rsquo;s called X
+server.</p>
+<p>Traditional Unix operating systems have <code>/tmp/.X11-unix/</code> directory where the X server stores it&rsquo;s unix
+domain sockets under. The naming format of these sockets are <code>X&lt;n&gt;</code>, where <code>n</code> is the display number of the
+server. This display number is stored via environment variable <code>DISPLAY</code>.</p>
+<div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh"><span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:03<span class="o">]</span> <span class="o">[</span>can@homebook discord<span class="o">]</span>
+$ ls -1 /tmp/.X11-unix/
+X0
+<span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:04<span class="o">]</span> <span class="o">[</span>can@homebook discord<span class="o">]</span>
+$ <span class="nb">echo</span> <span class="nv">$DISPLAY</span>
+:0.0
+</code></pre></div><p>We can feed this socket file to our container by <code>--volume</code> argument and set <code>DISPLAY</code> environment variable
+by <code>--env</code> argument. Before we go ahead and run our application there is one more point to be made.</p>
+<p>The X has server access program called <code>xhost</code> which is used to manage users that are allowed to make
+connections to the X server. Because Docker containers by default run with <code>root</code> user and <code>xhost</code> does not
+allow <code>root</code> user to make connection to X server, the client application would fail to start. For this reason,
+we have to match the container user with our host user by <code>--user</code> argument.</p>
+<div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh"><span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:05<span class="o">]</span> <span class="o">[</span>can@homebook discord<span class="o">]</span>
+$ mkdir -p /home/can/.config/discord <span class="c1"># create config directory for the application</span>
+<span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:06<span class="o">]</span> <span class="o">[</span>can@homebook ~<span class="o">]</span>
+$ id -u
+<span class="m">1000</span>
+<span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:07<span class="o">]</span> <span class="o">[</span>can@homebook discord<span class="o">]</span>
+<span class="c1"># --no-sandbox because this is an electron application and we already are in a container</span>
+<span class="c1"># --no-xshm because docker containers by default run in different IPC ns</span>
+$ docker run -it --rm <span class="se">\
+</span><span class="se"></span>    --volume /tmp/.X11-unix/X0:/tmp/.X11-unix/X0 <span class="se">\
+</span><span class="se"></span>    --volume /home/can/.config/discord:/home/can/.config/discord <span class="se">\
+</span><span class="se"></span>    --env <span class="nv">DISPLAY</span><span class="o">=</span>:0 <span class="se">\
+</span><span class="se"></span>    --env <span class="nv">HOME</span><span class="o">=</span>/home/can <span class="se">\
+</span><span class="se"></span>    --user <span class="m">1000</span> <span class="se">\
+</span><span class="se"></span>    discord:0.0.13 /usr/share/discord/Discord --no-sandbox --no-xshm
+Discord 0.0.13
+...
+</code></pre></div><p>At this point we should be able to see our Discord application being rendered in our host X server.</p>
+<h2 id="running-the-container-with-pulseaudio-optional">Running the container with PulseAudio (optional)</h2>
+<p>The X socket is only for graphical rendering and not for sound. So, with the current stage of our application,
+we would have no sound. If we would like to have sound from a containerized X11 application, we can introduce
+PulseAudio<sup id="fnref:6"><a href="#fn:6" class="footnote-ref" role="doc-noteref">6</a></sup> sockets to our container for sound communication. PulseAudio is also a server, like X, where it
+can communicate over unix domain sockets.</p>
+<p>Make sure that we have PulseAudio client library package installed in our container.</p>
+<div class="highlight"><pre class="chroma"><code class="language-Dockerfile" data-lang="Dockerfile"><span class="c"># Install pulseaudio client library.</span><span class="err">
+</span><span class="err"></span><span class="k">RUN</span> <span class="se">\
+</span><span class="se"></span>    apt-get install --no-install-recommends --yes <span class="se">\
+</span><span class="se"></span>        libpulse0<span class="err">
+</span></code></pre></div><p>We can issue
+below command to tell PulseAudio create an unix domain socket.</p>
+<div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh"><span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:06<span class="o">]</span> <span class="o">[</span>can@homebook ~<span class="o">]</span> 
+$ pactl load-module module-native-protocol-unix <span class="nv">socket</span><span class="o">=</span>/tmp/pulseaudio.socket
+</code></pre></div><p>We can feed this socket into our container and set <code>PULSE_SERVER</code> environment variable pointing to this
+socket to make our X11 application aware of this.</p>
+<div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh"><span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:08<span class="o">]</span> <span class="o">[</span>can@homebook discord<span class="o">]</span>
+$ docker run -it --rm <span class="se">\
+</span><span class="se"></span>    --volume /tmp/.X11-unix/X0:/tmp/.X11-unix/X0 <span class="se">\
+</span><span class="se"></span>    --volume /home/can/.config/discord:/home/can/.config/discord <span class="se">\
+</span><span class="se"></span>    --volume /tmp/pulseaudio.socket:/tmp/pulseaudio.socket <span class="se">\
+</span><span class="se"></span>    --env <span class="nv">DISPLAY</span><span class="o">=</span>:0 <span class="se">\
+</span><span class="se"></span>    --env <span class="nv">HOME</span><span class="o">=</span>/home/can <span class="se">\
+</span><span class="se"></span>    --env <span class="nv">PULSE_SERVER</span><span class="o">=</span>unix:/tmp/pulseaudio.socket <span class="se">\
+</span><span class="se"></span>    --user <span class="m">1000</span> <span class="se">\
+</span><span class="se"></span>    discord:0.0.13 /usr/share/discord/Discord --no-sandbox --no-xshm
+Discord 0.0.13
+...
+</code></pre></div><p>At this point both our speaker and microphone should be available to our containerized application.</p>
+<h2 id="integrating-application-shortcuts-optional">Integrating application shortcuts (optional)</h2>
+<p>Calling <code>docker run</code> each time we want to run our containerized X11 application is a bit hassle. Instead of
+this, we can integrate shortcuts using XDG Desktop Entry specification<sup id="fnref:7"><a href="#fn:7" class="footnote-ref" role="doc-noteref">7</a></sup>. Assuming that we have a shell
+script file containing necessary commands at <code>/opt/discord/run.sh</code>, we can create a desktop entry at
+<code>~/.local/share/applications/discord.desktop</code> like below.</p>
+<pre><code>[Desktop Entry]
+Name=Discord
+Comment=All-in-one voice and text chat for gamers that's free, secure, and works on both your desktop and phone.
+GenericName=Internet Messenger
+Exec=/usr/bin/pkexec sh /opt/discord/run.sh
+Icon=discord
+Type=Application
+Categories=Network;InstantMessaging;
+</code></pre><p>This would integrate with applications honoring XDG Desktop Entry specification. An example with
+<code>xfce4-appfinder</code> would be like below.</p>
+<p align="center">
+  <img src="/posts/containerized-x11-applications/xfce4-appfinder.png" alt="xfce4-appfinder"/>
+</p>
+<p>The <code>pkexec</code> command we wrote would allow script to gain root privileges when running the application, since
+docker by default, needs root user permissions to operate. This would prompt you to enter your user password,
+similar to <code>sudo</code>.</p>
+<p align="center">
+  <img src="/posts/containerized-x11-applications/pkexec-prompt.png" alt="pkexec-prompt"/>
+</p>
+<h2 id="conclusion">Conclusion</h2>
+<p>The final version of this exercise can be found at <a href="https://gitlab.com/cans-blog-exercises/discord-docker">here</a>.
+To keep things organized, I wrap shell scripts inside a Makefile. You can extract them to your liking.</p>
+<p>The main advantage of this for me would be filesystem isolation<sup id="fnref:8"><a href="#fn:8" class="footnote-ref" role="doc-noteref">8</a></sup>, which lets me to not touch my host
+system&rsquo;s packages. I tend to keep a minimal amount of packages in my host system. Some X11 applications might
+have large number of dependencies which you may want to avoid.</p>
+<p>The containerization of X11 applications can be useful in case of</p>
+<ul>
+<li>The Linux distro does not offer the application</li>
+<li>Incompatible dependencies</li>
+<li>Running multiple versions of it</li>
+<li>Trying out the application without installing it</li>
+<li>Restricting the application</li>
+</ul>
+<p>It should be noted that also solutions like Snap/Flatpak/AppImage can be used. I prefer not to have yet another
+package manager in my system.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1" role="doc-endnote">
+<p><a href="https://en.wikipedia.org/wiki/List_of_Linux_containers">https://en.wikipedia.org/wiki/List_of_Linux_containers</a> <a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:2" role="doc-endnote">
+<p><a href="https://en.wikipedia.org/wiki/Linux_namespaces">https://en.wikipedia.org/wiki/Linux_namespaces</a> <a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:3" role="doc-endnote">
+<p><a href="https://en.wikipedia.org/wiki/X_Window_System">https://en.wikipedia.org/wiki/X_Window_System</a> <a href="#fnref:3" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:4" role="doc-endnote">
+<p><a href="https://www.docker.com/">https://www.docker.com/</a> <a href="#fnref:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:5" role="doc-endnote">
+<p><a href="https://hub.docker.com/_/debian">https://hub.docker.com/_/debian</a> <a href="#fnref:5" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:6" role="doc-endnote">
+<p><a href="https://www.freedesktop.org/wiki/Software/PulseAudio/?">https://www.freedesktop.org/wiki/Software/PulseAudio/?</a> <a href="#fnref:6" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:7" role="doc-endnote">
+<p><a href="https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html">https://specifications.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html</a> <a href="#fnref:7" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:8" role="doc-endnote">
+<p><a href="https://man7.org/linux/man-pages/man7/mount_namespaces.7.html">https://man7.org/linux/man-pages/man7/mount_namespaces.7.html</a> <a href="#fnref:8" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+</article>
+
+        </main><footer id="footer">
+    Copyright © 2021 Can UNSAL
+</footer>
+</body>
+</html>

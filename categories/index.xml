@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Categories on can&#39;s corner</title>
+    <link>https://ucan35.github.io/categories/</link>
+    <description>Recent content in Categories on can&#39;s corner</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en-US</language>
+    
+	<atom:link href="https://ucan35.github.io/categories/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    
+    <item>
+      <title>Makefile &amp; Container Fusion</title>
+      <link>https://ucan35.github.io/makefile-container-fusion/</link>
+      <pubDate>Wed, 03 Feb 2021 09:41:50 +0000</pubDate>
+      
+      <guid>https://ucan35.github.io/makefile-container-fusion/</guid>
+      <description>Makefiles always make me feel comfortable whenever they are delivered with projects. The ease of following convention make build never ceases to amaze me. However, there is still one fear I have, system dependencies. Why don&amp;rsquo;t we get rid of that fear with fusion of makefiles and containers?
+Make Make1 is a great utility to automate many task for your projects. Instead of bulky shell scripts, I very much prefer makefiles2 for their ability to divide tasks into dependent sub tasks.</description>
+    </item>
+    
+    
+    
+    
+    
+    <item>
+      <title>Making Terminal Your Home</title>
+      <link>https://ucan35.github.io/making-terminal-your-home/</link>
+      <pubDate>Mon, 01 Feb 2021 09:40:38 +0000</pubDate>
+      
+      <guid>https://ucan35.github.io/making-terminal-your-home/</guid>
+      <description>Home is where you feel comfortable and safe. It&amp;rsquo;s your place that you can organize stuff to your convention. The very same feeling with your with your terminal can empower you and increase your productivity greatly.
+The reason why I prefer terminals is not because that they make you cool. While I don&amp;rsquo;t deny that they indeed make you cool, the main reason is that they provide you only the most essential data, text streams.</description>
+    </item>
+    
+    
+    
+    <item>
+      <title>Containerized X11 Applications</title>
+      <link>https://ucan35.github.io/containerized-x11-applications/</link>
+      <pubDate>Sat, 30 Jan 2021 18:29:16 +0000</pubDate>
+      
+      <guid>https://ucan35.github.io/containerized-x11-applications/</guid>
+      <description>Containers1 are great. They provide us means to isolate applications by leveraging Linux namespaces2. We can run any kind of application under containers, including X113 applications.
+X11 applications are essentially applications with GUI&amp;rsquo;s that use X. While applications like standard Linux utilities can be easily run under containers since they tend to have minimal dependencies, X11 applications on the other hand, can be a bit more difficult to do so.</description>
+    </item>
+    
+    
+  </channel>
+</rss>

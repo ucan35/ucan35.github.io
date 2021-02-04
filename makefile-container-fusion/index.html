@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html><head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="series of technical writeups about computers and software development">
+    
+    <link rel="shortcut icon" href="https://ucan35.github.io/favicon.ico">
+    
+    <link rel="stylesheet" href="/css/style.min.css">
+
+    <title>Makefile &amp; Container Fusion</title>
+</head>
+<body><header id="banner">
+    <h2><a href="https://ucan35.github.io">can&#39;s corner</a></h2>
+    <nav>
+        <ul>
+            <li>
+                <a href="/" title="posts">posts</a>
+            </li><li>
+                <a href="/about/" title="about">about</a>
+            </li>
+        </ul>
+    </nav>
+</header>
+<main id="content">
+<article>
+    <header id="post-header">
+        <h1>Makefile &amp; Container Fusion</h1><time>February 3, 2021</time></header><p>Makefiles always make me feel comfortable whenever they are delivered with projects. The ease of following
+convention <code>make build</code> never ceases to amaze me. However, there is still one fear I have, system
+dependencies. Why don&rsquo;t we get rid of that fear with fusion of makefiles and containers?</p>
+<h2 id="make">Make</h2>
+<p>Make<sup id="fnref:1"><a href="#fn:1" class="footnote-ref" role="doc-noteref">1</a></sup> is a great utility to automate many task for your projects. Instead of bulky shell scripts, I very
+much prefer makefiles<sup id="fnref:2"><a href="#fn:2" class="footnote-ref" role="doc-noteref">2</a></sup> for their ability to divide tasks into dependent sub tasks. These tasks are called
+targets in make context. You probably have seen <code>make build</code> and <code>make install</code> duo. Those are most
+conventional targets. Another thing is, make is time aware and can deduce only required tasks upon change. No
+need to execute targets all over.</p>
+<p>While It&rsquo;s possible to vendor<sup id="fnref:3"><a href="#fn:3" class="footnote-ref" role="doc-noteref">3</a></sup> all dependencies with projects, this is not practical. At one point, every
+system has a dependency to another. Makefiles may require system dependencies to meet their targets. These can
+be many things like binary files under <code>/usr/bin</code> or shared libraries. In some cases, these dependencies can be
+very specific to a version. We can guarantee these file dependencies with utilizing containers.</p>
+<h2 id="containers">Containers</h2>
+<p>Containers<sup id="fnref:4"><a href="#fn:4" class="footnote-ref" role="doc-noteref">4</a></sup> enable you to isolate your environment in many aspects. Under the hood, containers leverage
+Linux namespaces<sup id="fnref:5"><a href="#fn:5" class="footnote-ref" role="doc-noteref">5</a></sup>. In layman&rsquo;s terms they let you to insulate your file systems, networks, processes and
+many more.</p>
+<p>The one we are interested with today is file system insulation, which is thanks to mount namespaces<sup id="fnref:6"><a href="#fn:6" class="footnote-ref" role="doc-noteref">6</a></sup>. With
+this at hand, we can setup a environment where we can guarantee that file dependencies would be satisfied.</p>
+<h2 id="the-fusion">The fusion</h2>
+<p>Like <code>make build</code> always makes me happy, <code>make docker_build</code> makes me even happier. The idea is to wrap
+make environment inside containers where It&rsquo;s safe to run tasks with file dependencies. For this exercise, we
+will use Docker<sup id="fnref:7"><a href="#fn:7" class="footnote-ref" role="doc-noteref">7</a></sup> to containerize make&rsquo;s file system.</p>
+<p>Let&rsquo;s have a simple C++ program that parses numbers from json files and does basic arithmetic operations on
+them respecting order precedence. To have some spice, we shall have numbers in any radix<sup id="fnref:8"><a href="#fn:8" class="footnote-ref" role="doc-noteref">8</a></sup>.</p>
+<script id="asciicast-TAPvalnt9xgV4k1CGxbIfPPfC" src="https://asciinema.org/a/TAPvalnt9xgV4k1CGxbIfPPfC.js" data-speed="1.5" async></script>
+<p>Because our time is too precious to wait, we have used <code>rapidjson</code><sup id="fnref:9"><a href="#fn:9" class="footnote-ref" role="doc-noteref">9</a></sup>. And because we are always
+self-criticizing, we have added component tests with <code>pytest-bdd</code><sup id="fnref:10"><a href="#fn:10" class="footnote-ref" role="doc-noteref">10</a></sup>. What a perfection we are. A simple
+makefile to cover both build and component test stages would be like the following.</p>
+<div class="highlight"><pre class="chroma"><code class="language-make" data-lang="make"><span class="nf">all</span><span class="o">:</span> <span class="n">build</span>
+
+<span class="nf">build</span><span class="o">:</span> <span class="n">jsoncalc</span>
+<span class="nf">jsoncalc</span><span class="o">:</span> <span class="n">src</span>/<span class="n">jsoncalc</span>.<span class="n">cpp</span>
+	g++ -Wall -Wextra $^ -o <span class="nv">$@</span>
+
+<span class="nf">.PHONY</span><span class="o">:</span>
+<span class="nf">component_test</span><span class="o">:</span> <span class="n">jsoncalc</span>
+	python3 -m pytest <span class="se">\
+</span><span class="se"></span>		--basetemp<span class="o">=</span>tmp_pytest <span class="se">\
+</span><span class="se"></span>		--verbose <span class="se">\
+</span><span class="se"></span>		test/steps
+</code></pre></div><p>However nice it may look, this makefile assumes that there is <code>g++</code> with <code>rapidjson</code> header files and <code>python</code>
+with <code>pytest</code> packages installed on the running system. This assumption list could have been much longer for
+real projects.</p>
+<p>We can ensure these assumptions by introducing make &amp; container fusion here. This can be realized with
+following makefile directives.</p>
+<div class="highlight"><pre class="chroma"><code class="language-make" data-lang="make"><span class="nv">PROJECT_NAME</span> <span class="o">?=</span> jsoncalc
+<span class="nv">IMAGE_NAME_TAG</span> <span class="o">=</span> <span class="k">$(</span>PROJECT_NAME<span class="k">)</span>
+
+<span class="c"># Usage: docker_cmd &lt;additional-run-options&gt; &lt;image-directory-under-container&gt; &lt;args&gt;
+</span><span class="c"></span><span class="err">define</span> <span class="err">docker_cmd</span>
+	<span class="err">@</span><span class="c"># Strip whitespaces.
+</span><span class="c"></span>	<span class="nv">image_name</span><span class="o">=</span><span class="k">$(</span>shell expr <span class="k">$(</span>2<span class="k">)</span> : <span class="s2">&#34;\(\S\+\)&#34;</span><span class="k">)</span> <span class="o">&amp;&amp;</span> <span class="se">\
+</span><span class="se"></span>			   docker build --tag <span class="s2">&#34;</span><span class="k">$(</span>IMAGE_NAME_TAG<span class="k">)</span><span class="s2">:</span><span class="nv">$$</span><span class="s2">{image_name}&#34;</span> <span class="s2">&#34;container/</span><span class="nv">$$</span><span class="s2">{image_name}&#34;</span> <span class="o">&amp;&amp;</span> <span class="se">\
+</span><span class="se"></span>	docker run <span class="se">\
+</span><span class="se"></span>		<span class="k">$(</span>DOCKER_OPTS<span class="k">)</span> <span class="se">\
+</span><span class="se"></span>		<span class="k">$(</span>1<span class="k">)</span> <span class="se">\
+</span><span class="se"></span>		<span class="s2">&#34;</span><span class="k">$(</span>IMAGE_NAME_TAG<span class="k">)</span><span class="s2">:</span><span class="nv">$$</span><span class="s2">{image_name}&#34;</span> <span class="se">\
+</span><span class="se"></span>		<span class="k">$(</span>3<span class="k">)</span>
+<span class="err">endef</span>
+
+<span class="c"># Array of variables to feed into docker environment.
+</span><span class="c"></span><span class="nv">DOCKER_ENV_VARS</span> <span class="o">=</span> <span class="se">\
+</span><span class="se"></span>	TERM
+
+<span class="nv">DOCKER_OPTS</span> <span class="o">=</span> <span class="se">\
+</span><span class="se"></span>	--interactive <span class="se">\
+</span><span class="se"></span>	--tty <span class="se">\
+</span><span class="se"></span>	--rm <span class="se">\
+</span><span class="se"></span>	--volume <span class="s1">&#39;$(CURDIR):$(CURDIR)&#39;</span> <span class="se">\
+</span><span class="se"></span>	--workdir <span class="s1">&#39;$(CURDIR)&#39;</span> <span class="se">\
+</span><span class="se"></span>	--user <span class="k">$(</span>shell id --user<span class="k">)</span>:<span class="k">$(</span>shell id --group<span class="k">)</span> <span class="se">\
+</span><span class="se"></span>	<span class="k">$(</span>foreach var, <span class="k">$(</span>DOCKER_ENV_VARS<span class="k">)</span>, --env <span class="k">$(</span>var<span class="k">))</span> <span class="se">\
+</span><span class="se"></span>
+<span class="nf">.PHONY</span><span class="o">:</span> <span class="n">docker_</span>%
+<span class="nf">docker_%</span><span class="o">:</span>
+	<span class="k">$(</span>call docker_cmd ,<span class="se">\
+</span><span class="se"></span>		<span class="k">$(</span>DOCKER_EXTRA_OPTS<span class="k">)</span> ,<span class="se">\
+</span><span class="se"></span>		<span class="k">$(</span>subst docker_,,<span class="nv">$@</span><span class="k">)</span> ,<span class="se">\
+</span><span class="se"></span>		<span class="k">$(</span>DOCKER_PRE_CMD<span class="k">)</span> <span class="k">$(</span>MAKE<span class="k">)</span> <span class="k">$(</span>subst docker_,,<span class="nv">$@</span><span class="k">)</span> <span class="se">\
+</span><span class="se"></span>	<span class="k">)</span>
+
+<span class="nf">docker_component_test</span><span class="o">:</span> <span class="n">docker_build</span>
+</code></pre></div><ol>
+<li>
+<p><code>docker_cmd</code><br>
+You can think this of as a function inside Makefile with specified arguments. This function automatically
+deduces the path for Dockerfile from Its target name and builds required container image for relevant
+target. After building is complete, It runs the arguments supplied to is It as if It was ran under container.</p>
+<p>E.g. <code>make docker_build</code> would look for <code>containers/build/Dockerfile</code> and build It. After that, It would
+spin up the built container and issue the command provided with <code>args</code> parameter under container.</p>
+<div class="highlight"><pre class="chroma"><code class="language-sh" data-lang="sh"><span class="o">[</span>0<span class="o">]</span> <span class="o">[</span>00:01<span class="o">]</span> <span class="o">[</span>can@homebook jsoncalc<span class="o">]</span> <span class="o">(</span>master<span class="o">)</span>
+$ docker images <span class="p">|</span> grep jsoncalc
+jsoncalc                                 component_test   fed064a9f4b6   About an hour ago   134MB
+jsoncalc                                 build            fbba4605e463   About an hour ago   246MB
+</code></pre></div></li>
+<li>
+<p><code>docker_env_vars</code> and <code>docker_ops</code><br>
+These are for configurations of environment variables that should be forwarded from host to container and
+default docker options to access source/test files with same host uid/gid, respectively.</p>
+</li>
+<li>
+<p><code>docker_%</code><br>
+This is a wildcard make target that captures every <code>docker_&lt;actual_target&gt;</code> calls. Essentially this uses
+the <code>docker_cmd</code> function to build the relevant container image and spin It up. What critical here is, It
+deduces real target from issued command and run the very same make command under the container. What good
+about this is this would be automatically applicable for any future targets defined inside the Makefile.</p>
+<p>E.g. for <code>make docker_build</code> It would issue <code>make build</code> command under relevant container.</p>
+</li>
+<li>
+<p><code>docker_component_test: docker_build</code><br>
+This is for to keep same target dependencies as <code>component_test</code> target already requires <code>build</code> target.</p>
+</li>
+</ol>
+<h3 id="action">Action</h3>
+<script id="asciicast-fZow60sQoN2Xlm7Z517WCPFtI" src="https://asciinema.org/a/fZow60sQoN2Xlm7Z517WCPFtI.js" data-speed="1.5" async></script>
+<h2 id="conclusion">Conclusion</h2>
+<p>The final version of this exercise can be found at <a href="https://gitlab.com/cans-blog-exercises/make-container-fusion">here</a>.</p>
+<p>This can greatly aid software development/test cycles making them both faster and easier. The technique can be
+implemented for many scenarios such like including <code>Selenium</code> tests with X11 usage under containers.</p>
+<p>As this prune most of project dependencies, CI/CD integration can be easy as running command
+<code>make docker_build</code> from your CI/CD solution. And this can be significant at onboarding process' where
+most developer/testers struggle with setting-up their environments for their project needs.</p>
+<section class="footnotes" role="doc-endnotes">
+<hr>
+<ol>
+<li id="fn:1" role="doc-endnote">
+<p><a href="https://www.gnu.org/software/make/">https://www.gnu.org/software/make/</a> <a href="#fnref:1" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:2" role="doc-endnote">
+<p>Makefile or makefile, the file which make looks for <a href="#fnref:2" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:3" role="doc-endnote">
+<p><a href="https://devops.stackexchange.com/a/1292">https://devops.stackexchange.com/a/1292</a> <a href="#fnref:3" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:4" role="doc-endnote">
+<p><a href="https://en.wikipedia.org/wiki/List_of_Linux_containers">https://en.wikipedia.org/wiki/List_of_Linux_containers</a> <a href="#fnref:4" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:5" role="doc-endnote">
+<p><a href="https://en.wikipedia.org/wiki/Linux_namespaces">https://en.wikipedia.org/wiki/Linux_namespaces</a> <a href="#fnref:5" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:6" role="doc-endnote">
+<p><a href="https://man7.org/linux/man-pages/man7/mount_namespaces.7.html">https://man7.org/linux/man-pages/man7/mount_namespaces.7.html</a> <a href="#fnref:6" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:7" role="doc-endnote">
+<p><a href="https://www.docker.com/">https://www.docker.com/</a> <a href="#fnref:7" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:8" role="doc-endnote">
+<p><a href="https://en.wikipedia.org/wiki/Radix">https://en.wikipedia.org/wiki/Radix</a> <a href="#fnref:8" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:9" role="doc-endnote">
+<p><a href="https://rapidjson.org/">https://rapidjson.org/</a> <a href="#fnref:9" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+<li id="fn:10" role="doc-endnote">
+<p><a href="https://docs.pytest.org/en/stable/">https://docs.pytest.org/en/stable/</a>, <a href="https://github.com/pytest-dev/pytest-bdd">https://github.com/pytest-dev/pytest-bdd</a> <a href="#fnref:10" class="footnote-backref" role="doc-backlink">&#x21a9;&#xfe0e;</a></p>
+</li>
+</ol>
+</section>
+</article>
+
+        </main><footer id="footer">
+    Copyright © 2021 Can UNSAL
+</footer>
+</body>
+</html>
