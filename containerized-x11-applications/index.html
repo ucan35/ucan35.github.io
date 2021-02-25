@@ -102,7 +102,7 @@ $ docker run -it --rm <span class="se">\
 </span><span class="se"></span>    --env <span class="nv">DISPLAY</span><span class="o">=</span>:0 <span class="se">\
 </span><span class="se"></span>    --env <span class="nv">HOME</span><span class="o">=</span>/home/can <span class="se">\
 </span><span class="se"></span>    --user <span class="m">1000</span> <span class="se">\
-</span><span class="se"></span>    discord:0.0.13 /usr/share/discord/Discord --no-sandbox --no-xshm
+</span><span class="se"></span>    discord:0.0.13 /usr/share/discord/Discord --no-sandbox --no-xshm --disable-dev-shm-usage
 Discord 0.0.13
 ...
 </code></pre></div><p>At this point we should be able to see our Discord application being rendered in our host X server.</p>
