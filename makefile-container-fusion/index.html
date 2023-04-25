@@ -50,7 +50,7 @@ make environment inside containers where It&rsquo;s safe to run tasks with file 
 will use Docker<sup id="fnref:7"><a href="#fn:7" class="footnote-ref" role="doc-noteref">7</a></sup> to containerize make&rsquo;s file system.</p>
 <p>Let&rsquo;s have a simple C++ program that parses numbers from json files and does basic arithmetic operations on
 them respecting order precedence. To have some spice, we shall have numbers in any radix<sup id="fnref:8"><a href="#fn:8" class="footnote-ref" role="doc-noteref">8</a></sup>.</p>
-<script id="asciicast-TAPvalnt9xgV4k1CGxbIfPPfC" src="https://asciinema.org/a/TAPvalnt9xgV4k1CGxbIfPPfC.js" data-speed="1.5" async></script>
+<script async id="asciicast-389501" src="https://asciinema.org/a/389501.js" data-speed="1.5"></script>
 <p>Because our time is too precious to wait, we have used <code>rapidjson</code><sup id="fnref:9"><a href="#fn:9" class="footnote-ref" role="doc-noteref">9</a></sup>. And because we are always
 self-criticizing, we have added component tests with <code>pytest-bdd</code><sup id="fnref:10"><a href="#fn:10" class="footnote-ref" role="doc-noteref">10</a></sup>. What a perfection we are. A simple
 makefile to cover both build and component test stages would be like the following.</p>
@@ -140,7 +140,7 @@ This is for to keep same target dependencies as <code>component_test</code> targ
 </li>
 </ol>
 <h3 id="action">Action</h3>
-<script id="asciicast-fZow60sQoN2Xlm7Z517WCPFtI" src="https://asciinema.org/a/fZow60sQoN2Xlm7Z517WCPFtI.js" data-speed="1.5" async></script>
+<script async id="asciicast-389502" src="https://asciinema.org/a/389502.js" data-speed="1.5"></script>
 <h2 id="conclusion">Conclusion</h2>
 <p>The final version of this exercise can be found at <a href="https://gitlab.com/cans-blog-exercises/make-container-fusion">here</a>.</p>
 <p>This can greatly aid software development/test cycles making them both faster and easier. The technique can be
